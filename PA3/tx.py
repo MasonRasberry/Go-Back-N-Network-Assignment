@@ -20,8 +20,9 @@ def reliablyTransfer(rx_ip, rx_port, filename):
     # Connect to server and send message
     print(f"client: connecting to {rx_ip}")
     with open(filename, "rb") as file:
-        message = file.read(PAYLOAD_SIZE)
-        mySocket.sendto(message, (rx_ip,rx_port))
+        while message := file.read(PAYLOAD_SIZE):
+            mySocket.sendto(message, (rx_ip,rx_port))
+        mySocket.sendto(b"DONE", (rx_ip,rx_port))
 
     # Receive length
     dataLength, _ = mySocket.recvfrom(1)

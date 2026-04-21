@@ -7,7 +7,6 @@ PAYLOAD_SIZE = 50
 SEQNUM_SIZE = 10
 WINDOW_SIZE = 5
 
-
 def reliablyReceive(rx_ip, rx_port, filename):
     # Implement the UDP receiver to reliably receive the file
     # You may create other files or methods to further refactor your code, 
@@ -18,13 +17,14 @@ def reliablyReceive(rx_ip, rx_port, filename):
     
     message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
 
-    messageLength = len(message)
-
-    sock.sendto(messageLength.to_bytes(1, byteorder='big'), cAddress)
-    sock.sendto(message, cAddress)
     with open(filename,"w") as file:
         file.write(message.decode())
-    
+        while True:
+            message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
+            if message == b"DONE":
+                break
+            file.write(message.decode())
+    sock.close()
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="UDP Receiver")
