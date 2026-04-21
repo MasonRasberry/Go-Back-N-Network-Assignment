@@ -18,12 +18,14 @@ def reliablyReceive(rx_ip, rx_port, filename):
     message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
 
     with open(filename,"w") as file:
-        file.write(message.decode())
+        packet = Packet.deserialize(message)
+        file.write(packet.payload)
         while True:
             message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
-            if message == b"DONE":
+            packet = Packet.deserialize()
+            if packet.flag == 2:
                 break
-            file.write(message.decode())
+            file.write(packet.payload)
     sock.close()
     
 if __name__ == "__main__":
