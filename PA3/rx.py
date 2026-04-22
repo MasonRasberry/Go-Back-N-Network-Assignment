@@ -15,14 +15,14 @@ def reliablyReceive(rx_ip, rx_port, filename):
     sock.bind((rx_ip,rx_port))
     print(f"Socket created at {rx_ip,rx_port}")
     
-    message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
+    message, cAddress = sock.recvfrom(1024)
 
     with open(filename,"w") as file:
         packet = Packet.deserialize(message)
         file.write(packet.payload)
         while True:
-            message, cAddress = sock.recvfrom(PAYLOAD_SIZE)
-            packet = Packet.deserialize()
+            message, cAddress = sock.recvfrom(1024)
+            packet = Packet.deserialize(message)
             if packet.flag == 2:
                 break
             file.write(packet.payload)
