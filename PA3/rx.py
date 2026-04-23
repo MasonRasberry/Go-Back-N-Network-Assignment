@@ -21,6 +21,7 @@ def reliablyReceive(rx_ip, rx_port, filename):
 
             #FIN packet
             if packet.flag == 2:
+                file.write(packet.payload)
                 ack = Packet(0, last_acked, 0, "")
                 sock.sendto(ack.serialize(), addr)
                 continue
