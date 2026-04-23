@@ -12,23 +12,84 @@ packetList = list()
 
 
 def reliablyTransfer(rx_ip, rx_port, filename):
-    # Implement the UDP sender to reliably transfer the file
-    # Create log files as well to log the events in the sender side
-    # Set up socket
     mySocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    mySocket.settimeout(0.5)  # 🔥 TIMEOUT
 
-    # Connect to server and send message
-    print(f"client: connecting to {rx_ip}")
+    window = CircularQueue(WINDOW_SIZE)
+
+    base = 0          # oldest unACKed packet
+    next_seq = 0      # next sequence number to use
+
+    packets = []
+
+    # 🔹 Read file and create all packets first
     with open(filename, "rb") as file:
-        index = 0
-        while message := file.read(PAYLOAD_SIZE):
-            packet = Packet(1,index,len(message.decode()),message.decode())
-            toSend = packet.serialize()
-            mySocket.sendto(toSend,(rx_ip,rx_port))
-            index+=1
-        finalPacket = Packet(2,index,0,"")
-        finalSend = finalPacket.serialize()
-        mySocket.sendto(finalSend,(rx_ip,rx_port))
+        while chunk := file.read(PAYLOAD_SIZE):
+            packets.append(Packet(1, next_seq % SEQNUM_SIZE, len(chunk), chunk.decode()))
+            next_seq += 1
+
+    total_packets = len(packets)
+
+    base = 0
+    next_seq = 0
+
+    while base < total_packets:
+
+        # 🔹 Fill window
+        while not window.isFull() and next_seq < total_packets:
+            pkt = packets[next_seq]
+            mySocket.sendto(pkt.serialize(), (rx_ip, rx_port))
+            logging.debug(f"Sent packet {pkt.seqnum}")
+
+            window.enqueue(pkt)
+            next_seq += 1
+
+        try:
+            # 🔹 Receive ACK
+            ack_data, _ = mySocket.recvfrom(1024)
+            ack_packet = Packet.deserialize(ack_data)
+
+            if ack_packet.flag == 0:
+                ack_num = ack_packet.seqnum
+                logging.debug(f"Received ACK {ack_num}")
+
+                # 🔥 Slide window (cumulative ACK)
+                while not window.isEmpty():
+                    front_pkt = window.getFront()
+                    if front_pkt.seqnum <= ack_num:
+                        window.dequeue()
+                        base += 1
+                    else:
+                        break
+
+        except socket.timeout:
+            # 🔥 TIMEOUT → Go-Back-N resend
+            logging.debug("Timeout! Resending window")
+
+            temp_list = []
+            while not window.isEmpty():
+                pkt = window.dequeue()
+                temp_list.append(pkt)
+
+            # re-enqueue + resend
+            for pkt in temp_list:
+                mySocket.sendto(pkt.serialize(), (rx_ip, rx_port))
+                logging.debug(f"Resent packet {pkt.seqnum}")
+                window.enqueue(pkt)
+
+    # 🔹 Send FIN
+    fin = Packet(2, 0, 0, "")
+    mySocket.sendto(fin.serialize(), (rx_ip, rx_port))
+
+    # 🔹 Wait for FIN ACK
+    while True:
+        try:
+            data, _ = mySocket.recvfrom(1024)
+            pkt = Packet.deserialize(data)
+            if pkt.flag == 0:
+                break
+        except socket.timeout:
+            mySocket.sendto(fin.serialize(), (rx_ip, rx_port))
 
     mySocket.close()
     
