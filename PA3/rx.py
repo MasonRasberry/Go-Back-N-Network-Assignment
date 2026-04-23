@@ -8,25 +8,36 @@ SEQNUM_SIZE = 10
 WINDOW_SIZE = 5
 
 def reliablyReceive(rx_ip, rx_port, filename):
-    # Implement the UDP receiver to reliably receive the file
-    # You may create other files or methods to further refactor your code, 
-    # but do not change the signature of the method reliablyReceive
-    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    sock.bind((rx_ip,rx_port))
-    print(f"Socket created at {rx_ip,rx_port}")
-    
-    message, cAddress = sock.recvfrom(1024)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((rx_ip, rx_port))
 
-    with open(filename,"w") as file:
-        packet = Packet.deserialize(message)
-        file.write(packet.payload)
+    expected_seq = 0
+    last_acked = -1
+
+    with open(filename, "w") as file:
         while True:
-            message, cAddress = sock.recvfrom(1024)
-            packet = Packet.deserialize(message)
+            data, addr = sock.recvfrom(1024)
+            packet = Packet.deserialize(data)
+
+            #FIN packet
             if packet.flag == 2:
-                break
-            file.write(packet.payload)
-    sock.close()
+                ack = Packet(0, last_acked, 0, "")
+                sock.sendto(ack.serialize(), addr)
+                continue
+
+            if packet.flag == 1:
+                if packet.seqnum == expected_seq:
+                    #correct packet
+                    file.write(packet.payload)
+                    last_acked = expected_seq
+                    expected_seq = (expected_seq + 1) % SEQNUM_SIZE
+                else:
+                    #out-of-order → discard
+                    pass
+
+                #Always send ACK (last in-order)
+                ack = Packet(0, last_acked, 0, "")
+                sock.sendto(ack.serialize(), addr)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="UDP Receiver")
