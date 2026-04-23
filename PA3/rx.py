@@ -13,9 +13,10 @@ def reliablyReceive(rx_ip, rx_port, filename):
 
     expected_seq = 0
     last_acked = -1
+    receiving = True
 
-    with open(filename, "w") as file:
-        while True:
+    with open(filename, "a") as file:
+        while receiving:
             data, addr = sock.recvfrom(1024)
             packet = Packet.deserialize(data)
 
@@ -23,7 +24,7 @@ def reliablyReceive(rx_ip, rx_port, filename):
             if packet.flag == 2:
                 ack = Packet(0, last_acked, 0, "")
                 sock.sendto(ack.serialize(), addr)
-                continue
+                receiving = False
 
             if packet.flag == 1:
                 if packet.seqnum == expected_seq:

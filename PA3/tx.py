@@ -13,7 +13,7 @@ packetList = list()
 
 def reliablyTransfer(rx_ip, rx_port, filename):
     mySocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    mySocket.settimeout(0.5)  # 🔥 TIMEOUT
+    mySocket.settimeout(5)  # 🔥 TIMEOUT
 
     window = CircularQueue(WINDOW_SIZE)
 
@@ -61,7 +61,9 @@ def reliablyTransfer(rx_ip, rx_port, filename):
                         base += 1
                     else:
                         break
-
+            if ack_packet.flag == 2:
+                ack_num = ack_packet.seqnum
+                logging.debug(f"Received FINACK {ack_num}")
         except socket.timeout:
             # 🔥 TIMEOUT → Go-Back-N resend
             logging.debug("Timeout! Resending window")
